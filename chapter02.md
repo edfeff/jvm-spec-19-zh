@@ -253,7 +253,7 @@ Java 虚拟机使用局部变量在方法调用时传递参数。 在类方法�
 ### 2.6.4. 正常方法调用完成
 无论是直接从 Java 虚拟机还是作为执行显式 throw 语句的结果,如果方法调用没有导致异常被抛出，则方法调用正常完成。如果当前方法的调用正常完成，则可以向调用方法返回一个值。 当调用的方法执行其中一个返回指令 时会发生这种情况，该指令的选择必须适合返回值的类型（如果有）。
 
-当前帧在这种情况下用于恢复调用者的状态，包括其局部变量和操作数堆栈，调用者的程序计数器适当递增以跳过方法调用指令。 然后在调用方法的帧中正常继续执行，并将返回值（如果有）压入该帧的操作数堆栈。
+当前帧在这种情况下用于恢复调用者的状态，包括其局部变量和操作数栈，调用者的程序计数器适当递增以跳过方法调用指令。 然后在调用方法的帧中正常继续执行，并将返回值（如果有）压入该帧的操作数栈。
 
 ### 2.6.5. 打断方法调用完成
 如果在方法内执行 Java 虚拟机指令导致 Java 虚拟机抛出异常，并且该异常未在方法内处理，则打断方法调用完成。 执行 athrow 指令也会导致显式抛出异常，如果当前方法未捕获异常，则会导致打断方法调用完成。 打断完成的方法调用永远不会向其调用者返回值。
@@ -395,7 +395,7 @@ Java 虚拟机抛出的异常是精确的：当控制转移发生时，在抛出
 
 Java 虚拟机中的每个方法都可能与零个或多个异常处理程序相关联。 异常处理程序指定实现异常处理程序处于活动状态的方法的 Java 虚拟机代码的偏移范围，描述异常处理程序能够处理的异常类型，并指定要处理的代码的位置 那个例外。 如果导致异常的指令的偏移量在异常处理程序的偏移量范围内，并且异常类型与异常处理程序处理的异常类是同一类或者是异常类的子类，则异常与异常处理程序相匹配。 抛出异常时，Java 虚拟机会在当前方法中搜索匹配的异常处理程序。 如果找到匹配的异常处理程序，系统将分支到匹配的处理程序指定的异常处理代码。
 
-如果在当前方法中没有找到这样的异常处理程序，则打断当前方法调用会完成。 在打断时，当前方法调用的操作数栈和局部变量被丢弃，它的帧被弹出，恢复调用方法的帧。 然后在调用者框架的上下文中重新抛出异常，依此类推，继续方法调用链。 如果在到达方法调用链的顶部之前没有找到合适的异常处理程序，则终止抛出异常的线程的执行。
+如果在当前方法中没有找到这样的异常处理程序，则打断当前方法调用会完成。 在打断时，当前方法调用的操作数栈和局部变量被丢弃，它的帧被弹出，恢复调用方法的帧。 然后在调用者栈的上下文中重新抛出异常，依此类推，继续方法调用链。 如果在到达方法调用链的顶部之前没有找到合适的异常处理程序，则终止抛出异常的线程的执行。
 
 在方法的异常处理程序中搜索匹配项的顺序很重要。 在类文件中，每个方法的异常处理程序都存储在一个表中。 在运行时，当抛出异常时，Java 虚拟机按照它们在类文件中相应异常处理程序表中出现的顺序，从该表的开头开始搜索当前方法的异常处理程序。
 
@@ -423,8 +423,593 @@ do {
 
 
 ### 2.11.1. 类型 和 Java 虚拟机
-Java 虚拟机指令集中的大多数指令都对有关它们执行的操作的类型信息进行编码。 例如，iload 指令 将必须为 int 的局部变量的内容加载到操作数堆栈中。 fload 指令 对浮点值执行相同的操作。 这两条指令可能具有相同的实现，但具有不同的操作码。
+Java 虚拟机指令集中的大多数指令都对有关它们执行的操作的类型信息进行编码。 例如，iload 指令 将必须为 int 的局部变量的内容加载到操作数栈中。 fload 指令 对浮点值执行相同的操作。 这两条指令可能具有相同的实现，但具有不同的操作码。
 
 对于大多数类型化指令，指令类型在操作码助记符中用一个字母明确表示：i 表示 int 操作，l 表示 long，s 表示短，b 表示 byte，c 表示 char，f 表示 float，d 表示 double , 供参考。 一些类型明确的指令在它们的助记符中没有类型字母。 例如，arraylength 始终对数组对象进行操作。 一些指令，例如 goto，无条件控制转移，不对类型化操作数进行操作。
 
 鉴于 Java 虚拟机的一字节操作码大小，将类型编码为操作码对其指令集的设计施加了压力。 如果每条类型化指令都支持 Java 虚拟机的所有运行时数据类型，那么指令的数量将超过一个字节所能表示的数量。 相反，Java 虚拟机的指令集为某些操作提供了较低级别的类型支持。 换句话说，指令集是故意不正交的。 必要时，可以使用单独的指令在不受支持和受支持的数据类型之间进行转换。
+
+
+下表总结了 Java 虚拟机指令集中的类型支持。 通过用类型列中的字母替换操作码列中指令模板中的 T 来构建具有类型信息的特定指令。 如果某些指令模板和类型的类型列为空白，则不存在支持该类型操作的指令。 比如int类型有加载指令iload，而byte类型没有加载指令。
+
+请注意，下表 中的大多数指令没有整数类型 byte、char 和 short 的形式。 没有一个具有布尔类型的形式。 编译器使用 Java 虚拟机指令对 byte 和 short 类型的文字值负载进行编码，这些指令在编译时或运行时将这些值符号扩展为 int 类型的值。 使用指令对 boolean 和 char 类型的文字值负载进行编码，这些指令在编译时或运行时将文字零扩展为 int 类型的值。 同样，使用 Java 虚拟机指令对 boolean、byte、short 和 char 类型值数组的加载进行编码，这些指令将值符号扩展或零扩展为 int 类型的值。 因此，对实际类型 boolean、byte、char 和 short 的值的大多数操作都由对计算类型 int 的值进行操作的指令正确执行。
+
+<table border="1">
+   <thead>
+      <tr>
+         <th>opcode</th>
+         <th><code>byte</code></th>
+         <th><code>short</code></th>
+         <th><code>int</code></th>
+         <th><code>long</code></th>
+         <th><code>float</code></th>
+         <th><code>double</code></th>
+         <th><code>char</code></th>
+         <th><code>reference</code></th>
+      </tr>
+   </thead>
+   <tbody>
+      <tr>
+         <td><span><em>Tipush</em></span></td>
+         <td><span><em>bipush</em></span></td>
+         <td><span><em>sipush</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tconst</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iconst</em></span></td>
+         <td><span><em>lconst</em></span></td>
+         <td><span><em>fconst</em></span></td>
+         <td><span><em>dconst</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>aconst</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Tload</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iload</em></span></td>
+         <td><span><em>lload</em></span></td>
+         <td><span><em>fload</em></span></td>
+         <td><span><em>dload</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>aload</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Tstore</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>istore</em></span></td>
+         <td><span><em>lstore</em></span></td>
+         <td><span><em>fstore</em></span></td>
+         <td><span><em>dstore</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>astore</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Tinc</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iinc</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Taload</em></span></td>
+         <td><span><em>baload</em></span></td>
+         <td><span><em>saload</em></span></td>
+         <td><span><em>iaload</em></span></td>
+         <td><span><em>laload</em></span></td>
+         <td><span><em>faload</em></span></td>
+         <td><span><em>daload</em></span></td>
+         <td><span><em>caload</em></span></td>
+         <td><span><em>aaload</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Tastore</em></span></td>
+         <td><span><em>bastore</em></span></td>
+         <td><span><em>sastore</em></span></td>
+         <td><span><em>iastore</em></span></td>
+         <td><span><em>lastore</em></span></td>
+         <td><span><em>fastore</em></span></td>
+         <td><span><em>dastore</em></span></td>
+         <td><span><em>castore</em></span></td>
+         <td><span><em>aastore</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Tadd</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iadd</em></span></td>
+         <td><span><em>ladd</em></span></td>
+         <td><span><em>fadd</em></span></td>
+         <td><span><em>dadd</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tsub</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>isub</em></span></td>
+         <td><span><em>lsub</em></span></td>
+         <td><span><em>fsub</em></span></td>
+         <td><span><em>dsub</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tmul</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>imul</em></span></td>
+         <td><span><em>lmul</em></span></td>
+         <td><span><em>fmul</em></span></td>
+         <td><span><em>dmul</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tdiv</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>idiv</em></span></td>
+         <td><span><em>ldiv</em></span></td>
+         <td><span><em>fdiv</em></span></td>
+         <td><span><em>ddiv</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Trem</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>irem</em></span></td>
+         <td><span><em>lrem</em></span></td>
+         <td><span><em>frem</em></span></td>
+         <td><span><em>drem</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tneg</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ineg</em></span></td>
+         <td><span><em>lneg</em></span></td>
+         <td><span><em>fneg</em></span></td>
+         <td><span><em>dneg</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tshl</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ishl</em></span></td>
+         <td><span><em>lshl</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tshr</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ishr</em></span></td>
+         <td><span><em>lshr</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tushr</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iushr</em></span></td>
+         <td><span><em>lushr</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tand</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>iand</em></span></td>
+         <td><span><em>land</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tor</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ior</em></span></td>
+         <td><span><em>lor</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Txor</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ixor</em></span></td>
+         <td><span><em>lxor</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>i2T</em></span></td>
+         <td><span><em>i2b</em></span></td>
+         <td><span><em>i2s</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>i2l</em></span></td>
+         <td><span><em>i2f</em></span></td>
+         <td><span><em>i2d</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>l2T</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>l2i</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>l2f</em></span></td>
+         <td><span><em>l2d</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>f2T</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>f2i</em></span></td>
+         <td><span><em>f2l</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>f2d</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>d2T</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>d2i</em></span></td>
+         <td><span><em>d2l</em></span></td>
+         <td><span><em>d2f</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tcmp</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>lcmp</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tcmpl</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>fcmpl</em></span></td>
+         <td><span><em>dcmpl</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>Tcmpg</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>fcmpg</em></span></td>
+         <td><span><em>dcmpg</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+      </tr>
+      <tr>
+         <td><span><em>if_TcmpOP</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>if_icmpOP</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>if_acmpOP</em></span></td>
+      </tr>
+      <tr>
+         <td><span><em>Treturn</em></span></td>
+         <td>&nbsp;</td>
+         <td>&nbsp;</td>
+         <td><span><em>ireturn</em></span></td>
+         <td><span><em>lreturn</em></span></td>
+         <td><span><em>freturn</em></span></td>
+         <td><span><em>dreturn</em></span></td>
+         <td>&nbsp;</td>
+         <td><span><em>areturn</em></span></td>
+      </tr>
+   </tbody>
+</table>
+
+
+下表 总结了 Java 虚拟机实际类型和 Java 虚拟机计算类型之间的映射。
+
+某些 Java 虚拟机指令（例如 pop 和 swap）在操作数栈上进行操作，而不考虑类型； 然而，此类指令仅限于用于某些计算类型类别的值，也在下表 中给出。
+
+<table border="1">
+   <thead>
+      <tr>
+         <th>Actual type</th>
+         <th>Computational type</th>
+         <th>Category</th>
+      </tr>
+   </thead>
+   <tbody>
+      <tr>
+         <td><code>boolean</code></td>
+         <td><code>int</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>byte</code></td>
+         <td><code>int</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>char</code></td>
+         <td><code>int</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>short</code></td>
+         <td><code>int</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>int</code></td>
+         <td><code>int</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>float</code></td>
+         <td><code>float</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>reference</code></td>
+         <td><code>reference</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>returnAddress</code></td>
+         <td><code>returnAddress</code></td>
+         <td>1</td>
+      </tr>
+      <tr>
+         <td><code>long</code></td>
+         <td><code>long</code></td>
+         <td>2</td>
+      </tr>
+      <tr>
+         <td><code>double</code></td>
+         <td><code>double</code></td>
+         <td>2</td>
+      </tr>
+   </tbody>
+</table>
+
+
+
+### 2.11.2. 加载和存储指令
+加载和存储指令 在局部变量表 和 Java 虚拟机栈的操作数栈之间传输值：
+
+- 将局部变量加载到操作数栈：`iload`、`iload_<n>`、`lload`、`lload_<n>`、`fload`、`fload_<n>`、`dload`、`dload_<n>`、`aload`、`aload_<n>`。
+
+- 将操作数栈中的值存储到局部变量中：`istore`、`istore_<n>`、`lstore`、`lstore_<n>`、`fstore`、`fstore_<n>`、`dstore`、`dstore_<n>`、`astore`、`astore_<n>`。
+
+- 将常量加载到操作数栈：`bipush`、`sipush`、`ldc`、`ldc_w`、`ldc2_w`、`aconst_null`、`iconst_m1`、`iconst_<i>`、`lconst_<l>`、`fconst_<f>`、`dconst_<d>`。
+
+- 使用更宽的索引或更大的直接操作数访问更多局部变量：`wide`。
+
+访问对象字段和数组元素的指令也将数据传入和传出操作数栈。
+
+上面显示的指令助记符在尖括号之间带有尾随字母（例如，`iload_<n>`）表示指令族（在 `iload_<n>` 的情况下具有成员 iload_0、iload_1、iload_2 和 iload_3）。 此类指令族是采用一个操作数的附加通用指令 (iload) 的特化。 对于专用指令，操作数是隐式的，不需要存储或取出。 语义在其他方面是相同的（iload_0 与操作数为 0 的 iload 意思相同）。 尖括号之间的字母指定该系列指令的隐式操作数的类型：对于 `<n>`，一个非负整数； 对于`<i>`，一个整数； 对于 `<l>`，一个长整数； 对于 `<f>`，一个浮点数； 对于 `<d>`，一个双精度值。 int 类型的形式在许多情况下用于对 byte、char 和 short 类型的值执行操作。
+
+整个规范中都使用了这种指令族符号。
+
+### 2.11.3. 算术指令
+算术指令计算的结果通常是操作数堆栈上两个值的函数，将结果推回操作数堆栈。 有两种主要的算术指令：对整数值进行运算的指令和对浮点值进行运算的指令。 在每一种类型中，算术指令专门用于 Java 虚拟机数字类型。 不直接支持对 byte、short 和 char 类型的值（或布尔类型的值进行整数运算； 这些操作由对 int 类型进行操作的指令处理。 整数和浮点指令在溢出和被零除时的行为也不同。 算术指令如下：
+
+- 加:`iadd`,`ladd`,`fadd`,`dadd`.
+- 减:`isub`,`lsub`,`fsub`,`dsub`.
+- 乘:`imul`,`lmul`,`fmul`,`dmul`.
+- 除:`idiv`,`ldiv`,`fdiv`,`ddiv`.
+- 余:`irem`,`lrem`,`frem`,`drem`.
+- 取反:`ineg`,`lneg`,`fneg`,`dneg`.
+- 位移:`ishl`,`ishr`,`iushr`,`lshl`,`lshr`,`lushr`.
+- 位或:`ior`,`lor`.
+- 位与:`iand`,`land`.
+- 位异或:`ixor`,`lxor`.
+- 自增:`iinc`.
+- 比较:`dcmpg`,`dcmpl`,`fcmpg`,`fcmpl`,`lcmp`.
+
+Java 编程语言运算符对整数和浮点值的语义直接由 Java 虚拟机指令集的语义支持。
+
+Java 虚拟机在对整数数据类型进行操作时不会指示溢出。 唯一可以抛出异常的整数运算是整数除法指令（`idiv` 和 `ldiv`）和整数余数指令（`irem` 和 `lrem`），如果除数为零，它们将抛出 ArithmeticException。
+
+Java 虚拟机在对浮点数据类型进行操作时不会指示上溢或下溢。 也就是说，浮点指令永远不会导致 Java 虚拟机抛出运行时异常（不要与 IEEE 754 浮点异常混淆）。 溢出的操作产生带符号的无穷大； 下溢的操作产生低于正常值或带符号的零； 没有唯一的数学定义结果的运算会产生 NaN。 所有以 NaN 作为操作数的数值运算都会产生 NaN 作为结果。
+
+对 long (`lcmp`) 类型值的比较执行带符号的比较。
+
+使用 IEEE 754 非信号比较执行浮点类型（`dcmpg`、`dcmpl`、`fcmpg`、`fcmpl`）值的比较。
+
+
+### 2.11.4. 类型转换指令
+类型转换指令允许在 Java 虚拟机数字类型之间进行转换。 这些可用于在用户代码中实现显式转换或缓解 Java 虚拟机指令集中缺乏正交性的问题。
+
+Java 虚拟机直接支持以下扩展数字转换：
+- int to long, float, or double
+- long to float or double
+- float to double
+
+扩大的数值转换指令是 `i2l`、`i2f`、`i2d`、`l2f`、`l2d` 和 `f2d`。 鉴于类型指令的命名约定和双关语使用 2 表示“to”，这些操作码的助记符很简单。 例如，`i2d` 指令将 int 值转换为 double。
+
+大多数扩大数值转换不会丢失有关数值总体大小的信息。 实际上，从 int 到 long 以及从 int 到 double 的转换根本不会丢失任何信息； 数值被准确保留。 从 float 扩大到 double 的转换也准确地保留了数值。
+
+从 int 到 float，或从 long 到 float，或从 long 到 double 的转换可能会丢失精度，也就是说，可能会丢失值的一些最低有效位； 生成的浮点值是整数值的正确舍入版本，使用舍入到最接近的舍入策略。
+
+尽管可能会丢失精度，但扩大数字转换永远不会导致 Java 虚拟机抛出运行时异常（不要与 IEEE 754 浮点异常混淆）。
+
+从 int 到 long 的扩展数字转换只是符号扩展 int 值的二进制补码表示以填充更宽的格式。 一个 char 到整数类型的扩展数字转换零扩展 char 值的表示以填充更宽的格式。
+
+请注意，不存在从整数类型 byte、char 和 short 到 int 类型的扩展数字转换。 如上中所述，byte、char 和 short 类型的值在内部扩展为 int 类型，从而使这些转换成为隐式的。
+
+Java 虚拟机还直接支持以下窄化数字转换：
+- int to byte, short, or char
+- long to int
+- float to int or long
+- double to int, long, or float
+
+缩小数值转换指令是 `i2b`、`i2c`、`i2s`、`l2i`、`f2i`、`f2l`、`d2i`、`d2l` 和 `d2f`。 缩小数字转换可能会导致值的符号不同、数量级不同或两者兼而有之； 它可能因此失去精度。
+
+从 int 或 long 到整数类型 T 的缩小数字转换简单地丢弃除 n 个最低位以外的所有位，其中 n 是用于表示类型 T 的位数。这可能导致结果值不具有相同的符号 作为输入值。
+
+在将浮点值缩小为整数类型 T 的数值转换中，其中 T 为 int 或 long，浮点值转换如下：
+
+- 如果浮点值是 NaN，转换的结果是 int 或 long 0。
+- 否则，如果浮点值不是无穷大，则使用向零舍入策略将浮点值舍入为整数值 V。 有两种情况：
+    - 如果 T 是 long 并且这个整数值可以表示为 long，那么结果就是 long 值 V。
+    - 如果 T 是 int 类型，并且这个整数值可以表示为 int，那么结果就是 int 值 V。
+- 除此以外：
+    - 该值必须太小（大负值或负无穷大），结果是 int 或 long 类型的最小可表示值。
+    - 或者该值必须太大（幅度很大的正值或正无穷大），结果是 int 或 long 类型的最大可表示值。
+
+
+从 double 到 float 的缩小数字转换的行为符合 IEEE 754。使用舍入到最接近的舍入策略正确舍入结果。 太小而无法表示为浮点数的值将转换为浮点类型的正或负零； 太大而无法表示为浮点数的值将转换为正无穷大或负无穷大。 double NaN 总是转换为 float NaN。
+
+尽管可能会发生上溢、下溢或精度损失，但缩小数字类型之间的转换永远不会导致 Java 虚拟机抛出运行时异常（不要与 IEEE 754 浮点异常混淆）。
+
+### 2.11.5. 对象创建和操作
+尽管类实例和数组都是对象，但 Java 虚拟机使用不同的指令集创建和操作类实例和数组：
+
+- 创建一个新的类实例：`new`。
+- 创建一个新数组：`newarray`、`anewarray`、`multiawarray`。
+- 访问类的字段（静态字段，称为类变量）和类实例的字段（非静态字段，称为实例变量）：`getstatic`、`putstatic`、`getfield`、`putfield`。
+- 将数组组件加载到操作数堆栈：`baload`、`caload`、`saload`、`iaload`、`laload`、`faload`、`daload`、`aaload`。
+- 将操作数堆栈中的值存储为数组组件：`bastore`、`castore`、`sastore`、`iastore`、`lastore`、`fastore`、`dastore`、`aastore`。
+- 获取数组的长度：`arraylength`。
+- 检查类实例或数组的属性：`instanceof`、`checkcast`。
+
+### 2.11.6. 操作数栈管理指令
+为直接操作操作数堆栈提供了许多指令：`pop`、`pop2`、`dup`、`dup2`、`dup_x1`、`dup2_x1`、`dup_x2`、`dup2_x2`、`swap`。
+
+### 2.11.7. 控制转移指令
+控制转移指令有条件或无条件地使 Java 虚拟机继续执行控制转移指令之后的指令以外的指令。 他们是：
+
+- 条件分支：`ifeq`、`ifne`、`iflt`、`ifle`、`ifgt`、`ifge`、`ifnull`、`ifnonnull`、`if_icmpeq`、`if_icmpne`、`if_icmplt`、`if_icmple`、`if_icmpgt` `if_icmpge`、`if_acmpeq`、`if_acmpne`。
+
+- 复合条件分支：`tableswitch`、`lookupswitch`。
+
+- 无条件分支：`goto`、`goto_w`、`jsr`、`jsr_w`、`ret`。
+
+Java 虚拟机具有不同的指令集，这些指令集在与 int 和引用类型的数据进行比较时有条件地分支。 它还具有用于测试 null 引用的不同条件分支指令，因此不需要为 null 指定具体值。
+
+使用 int 比较指令执行 boolean、byte、char 和 short 类型数据之间比较的条件分支。 比较数据类型 long、float 或 double 的条件分支是使用比较数据并生成 int 比较结果的指令启动的。 随后的 int 比较指令测试此结果并影响条件分支。 由于强调 int 比较，Java 虚拟机为类型 int 提供了丰富的条件分支指令补充。
+
+所有 int 条件控制传输指令都执行带符号的比较。
+
+### 2.11.8. 方法调用和返回指令
+以下五个指令调用方法：
+
+- `invokevirtual` 调用对象的实例方法，调度对象的（虚拟）类型。 这是 Java 编程语言中的正常方法分派。
+
+- `invokeinterface` 调用接口方法，搜索由特定运行时对象实现的方法以找到合适的方法。
+
+- `invokespecial` 调用需要特殊处理的实例方法，可以是实例初始化方法，也可以是当前类或其超类型的方法。
+
+- `invokestatic` 调用命名类中的类（静态）方法。
+
+- `invokedynamic` 调用作为绑定到 invokedynamic 指令的调用站点对象的目标的方法。 作为在第一次执行指令之前运行引导方法的结果，调用站点对象被 Java 虚拟机绑定到 invokedynamic 指令的特定词法出现。 因此，与调用方法的其他指令不同，invokedynamic 指令的每次出现都具有唯一的链接状态。
+
+方法返回指令，按返回类型区分，有ireturn（用于返回boolean、byte、char、short、int类型的值）、lreturn、freturn、dreturn、areturn。 此外，return 指令用于从声明为 void 的方法、实例初始化方法以及类或接口初始化方法中返回。
+
+###  2.11.9. 抛出异常
+使用 `athrow` 指令以编程方式抛出异常。 如果检测到异常情况，各种 Java 虚拟机指令也可以抛出异常。
+
+### 2.11.10. 同步
+Java 虚拟机通过一个同步结构支持方法和方法内指令序列的同步：`monitor`。
+
+方法级同步是隐式执行的，作为方法调用和返回的一部分。 同步方法在运行时常量池的 method_info 结构中通过 ACC_SYNCHRONIZED 标志进行区分，该标志由方法调用指令检查。 当调用设置了 ACC_SYNCHRONIZED 的方法时，执行线程进入监视器，调用方法本身，然后退出监视器，无论方法调用是正常完成还是突然完成。 在执行线程拥有监视器期间，没有其他线程可以进入它。 如果在调用synchronized方法时抛出异常，并且synchronized方法没有处理异常，则在synchronized方法重新抛出异常之前自动退出该方法的监视器。
+
+指令序列的同步通常用于对 Java 编程语言的同步块进行编码。 Java 虚拟机提供了 `monitorenter` 和 `monitorexit` 指令来支持这种语言结构。 同步块的正确实现需要来自以 Java 虚拟机为目标的编译器的合作。
+
+结构化锁定是指在方法调用期间，给定监视器上的每个出口都与该监视器上的前一个条目相匹配的情况。 由于无法保证提交给 Java 虚拟机的所有代码都将执行结构化锁定，因此允许但不要求 Java 虚拟机的实现强制执行以下两条保证结构化锁定的规则。 假设 T 是一个线程，M 是一个监视器。 然后：
+
+1. 在方法调用期间，T 在 M 上执行的监视器条目数必须等于在方法调用期间 T 在 M 上执行的监视器退出数，无论方法调用是正常完成还是突然完成。
+
+2. 在方法调用期间，自方法调用以来 T 在 M 上执行的监控器退出次数绝不能超过自方法调用以来 T 在 M 上执行的监控器条目数。
+
+请注意，在调用同步方法时由 Java 虚拟机自动执行的监视器进入和退出被认为是在调用方法的调用期间发生的。
+
+## 2.12. 类库
+Java 虚拟机必须为 Java SE 平台类库的实现提供足够的支持。 这些库中的一些类离不开Java虚拟机的配合是无法实现的。
+
+可能需要 Java 虚拟机特殊支持的类包括支持：
+
+- 反射，例如包java.lang.reflect中的类和类Class。
+
+- 加载和创建类或接口。 最明显的例子是类 ClassLoader。
+
+- 类或接口的链接和初始化。 上面引用的示例类也属于这一类。
+
+- 安全性，例如包java.security中的类和其他类，例如SecurityManager。
+
+- 多线程，例如 Thread 类。
+
+- 弱引用，例如包 java.lang.ref 中的类。
+
+上面的列表是说明性的，而不是全面的。 这些类或它们提供的功能的详尽列表超出了本规范的范围。 有关详细信息，请参阅 Java SE 平台类库的规范。
+
+## 2.13. public设计，private实现
+到目前为止，该规范已经勾勒出 Java 虚拟机的公共视图：类文件格式和指令集。 这些组件对于 Java 虚拟机的硬件、操作系统和实现独立性至关重要。 实现者可能更愿意将它们视为一种在每个实现 Java SE 平台的主机之间安全地通信程序片段的方法，而不是将其视为要严格遵循的蓝图。
+
+了解公共设计和私有实现之间的界限在哪里很重要。 Java 虚拟机实现必须能够读取类文件，并且必须准确地实现其中的 Java 虚拟机代码的语义。 这样做的一种方法是将此文档作为规范并逐字执行该规范。 但是，实现者在本规范的约束范围内修改或优化实现也是完全可行和可取的。 只要可以读取类文件格式并保持其代码的语义，实现者就可以以任何方式实现这些语义。 “幕后”是实现者的事，只要认真维护正确的外部接口即可。
+
+有一些例外：调试器、分析器和即时代码生成器都可能需要访问通常被认为是“底层”的 Java 虚拟机元素。 在适当的情况下，Oracle 与其他 Java 虚拟机实现者和工具供应商合作，开发 Java 虚拟机的通用接口以供此类工具使用，并在整个行业推广这些接口。
+
+实现者可以使用这种灵活性来定制 Java 虚拟机实现以实现高性能、低内存使用或可移植性。 在给定的实现中什么有意义取决于该实现的目标。 实现选项的范围包括以下内容：
+
+在加载时或执行期间将 Java 虚拟机代码翻译成另一个虚拟机的指令集。
+
+在加载时或执行期间将 Java 虚拟机代码转换为主机 CPU 的本机指令集（有时称为即时或 JIT 代码生成）。
+
+精确定义的虚拟机和目标文件格式的存在不需要显着限制实现者的创造力。 Java 虚拟机旨在支持许多不同的实现，提供新的和有趣的解决方案，同时保持实现之间的兼容性。
